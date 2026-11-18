@@ -366,10 +366,10 @@ async function startScan(){
     return;
   }
   try{
-    scanner = new Html5Qrcode('reader', {verbose:false});
+   scanner = new Html5Qrcode('reader', {verbose:false, experimentalFeatures: { useBarCodeDetectorIfSupported: true }});
     await scanner.start(
       {facingMode:'environment'},
-      {fps:10, qrbox:{width:280, height:170}},
+      {fps:20, qrbox:{width:300, height:200}},
       function(text){
         const now=Date.now();
         if(text===lastCode.code && now-lastCode.t < 1500) return; // 同一码 1.5s 内防抖
