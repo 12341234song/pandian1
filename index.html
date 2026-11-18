@@ -366,13 +366,20 @@ async function startScan(){
     return;
   }
   try{
-      scanner = new Html5Qrcode('reader', {
+          scanner = new Html5Qrcode('reader', {
       verbose: false,
-      experimentalFeatures: { useBarCodeDetectorIfSupported: true }
+      // 指定只识别常见的条形码格式，大幅提升扫描速度
+      formatsToSupport: [
+        Html5QrcodeSupportedFormats.EAN_13,
+        Html5QrcodeSupportedFormats.EAN_8,
+        Html5QrcodeSupportedFormats.CODE_128,
+        Html5QrcodeSupportedFormats.UPC_A,
+        Html5QrcodeSupportedFormats.UPC_E
+      ]
     });
-       await scanner.start(
+    await scanner.start(
       {facingMode:'environment'},
-      {fps:25, qrbox:{width:280, height:110}}, // 帧率拉到25，扫码框改成宽扁型，速度翻倍
+      {fps: 25}, // 取消固定扫码框，扫描全屏画面（支持正反向、各角度）
       function(text){
         const now=Date.now();
         if(text===lastCode.code && now-lastCode.t < 1500) return; // 同一码 1.5s 内防抖
