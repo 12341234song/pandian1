@@ -49,11 +49,25 @@ button:disabled{opacity:.45}
 .item-name{flex:1;font-size:14px;word-break:break-all}
 .item-qty{text-align:right;font-weight:600;color:var(--blue);min-width:64px}
 .item-qty small{display:block;font-weight:400;color:var(--gray);font-size:11px}
-/* 优化四个按钮的排版 */
-.item-ops{display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-end;max-width:140px}
-.item-ops button{padding:6px 4px;font-size:12px;line-height:1.2;border-radius:4px;font-weight:600;flex:1;min-width:40px}
+
+/* 优化：四个按钮改为 2x2 田字格布局 */
+.item-ops{
+  display:grid;
+  grid-template-columns: 1fr 1fr;
+  gap:6px;
+  width:130px;
+}
+.item-ops button{
+  padding:6px 0;
+  font-size:12.5px;
+  line-height:1.2;
+  border-radius:4px;
+  font-weight:600;
+  text-align:center;
+}
 .btn-minus{background:#fee2e2;color:var(--red)}
 .btn-plus{background:#dcfce7;color:var(--green)}
+
 .empty{text-align:center;color:#9ca3af;padding:18px 0;font-size:14px}
 .tabbar{position:fixed;left:0;right:0;bottom:0;display:flex;background:#fff;border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom);z-index:30}
 .tabbar button{flex:1;background:none;border-radius:0;padding:11px 0;font-size:13px;color:#6b7280}
@@ -87,8 +101,8 @@ button:disabled{opacity:.45}
       <!-- 扫码框覆盖层 -->
       <div style="position:relative; width:100%; min-height:250px; border-radius:10px; overflow:hidden; background:#000;">
         <div id="reader" style="width:100%; height:100%;"></div>
-        <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:85%; height:80px; border:2px dashed #16a34a; border-radius:8px; box-shadow:0 0 0 4000px rgba(0,0,0,0.5); pointer-events:none; z-index:10;">
-          <div style="position:absolute; bottom:-32px; left:0; width:100%; text-align:center; color:#fff; font-size:13px; text-shadow:0 1px 2px #000;">细支烟较难扫，请靠近并点击屏幕对焦</div>
+        <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:85%; height:110px; border:2px dashed #16a34a; border-radius:8px; box-shadow:0 0 0 4000px rgba(0,0,0,0.5); pointer-events:none; z-index:10;">
+          <div style="position:absolute; bottom:-32px; left:0; width:100%; text-align:center; color:#fff; font-size:13px; text-shadow:0 1px 2px #000;">请将条形码对准框内（正反均可）</div>
         </div>
       </div>
       
@@ -190,7 +204,7 @@ button:disabled{opacity:.45}
 
 <div id="toast"></div>
 
-<!-- 直接从你上传的 GitHub 本地文件加载 -->
+<!-- 从本地加载组件 -->
 <script src="html5-qrcode.min.js"></script>
 <script src="xlsx.full.min.js"></script>
 <script>
@@ -360,7 +374,7 @@ function undoLast(){
   s.updatedAt=Date.now();
   saveDB();
   
-  lastCode = {code: '', t: 0}; // 撤销后重置记忆
+  lastCode = {code: '', t: 0}; 
   
   showResult(true, '已撤销：'+last.name, '减少 '+(last.d/10)+' 条');
   refreshAll();
@@ -387,19 +401,14 @@ async function startScan(){
     });
     
     await scanner.start(
-      { facingMode: 'environment' },
+      { facingMode: 'environment' }, // 恢复全屏扫描
       { 
-        fps: 30, // 提高到30帧，捕捉速度拉满
-        qrbox: function(viewfinderWidth, viewfinderHeight) {
-          // 细支烟条码更细长，强制限制扫描区域只识别屏幕中间的一条线，极大加快解析速度
-          let width = Math.floor(viewfinderWidth * 0.85);
-          let height = Math.floor(viewfinderHeight * 0.15); 
-          return { width: width, height: height };
-        }
+        fps: 20 
+        // 不再强制使用 qrbox，让全屏参与识别，对细支烟更友好
       },
       function(text){
         const now=Date.now();
-        if(text === lastCode.code && now - lastCode.t < 2000) return;
+        if(text === lastCode.code && now - lastCode.t < 2000) return; // 2秒防抖
         lastCode = {code: text, t: now};
         handleCode(text);
       }
@@ -612,8 +621,8 @@ function renderShopList(){
   const box=$('#shopList');
   box.innerHTML=DB.shops.map(function(s){
     return '<div class="item"><div class="item-name">'+esc(s.name)+'</div>'+
-      '<div class="item-ops" style="max-width:none">'+
-      '<button data-shop="edit" data-id="'+s.id+'" style="margin-right:6px;padding:6px 12px">改名</button>'+
+      '<div class="item-ops" style="display:flex;width:auto;gap:6px;">'+
+      '<button data-shop="edit" data-id="'+s.id+'" style="padding:6px 12px">改名</button>'+
       '<button data-shop="del" data-id="'+s.id+'" class="danger" style="padding:6px 12px">删除</button>'+
       '</div></div>';
   }).join('');
