@@ -81,7 +81,7 @@ button:disabled{opacity:.45}
     <div class="card" id="sessionInfo"></div>
 
     <div class="card" style="padding:8px">
-      <!-- 扫码视频与覆盖框 -->
+      <!-- 扫码框覆盖层 -->
       <div style="position:relative; width:100%; min-height:250px; border-radius:10px; overflow:hidden; background:#000;">
         <div id="reader" style="width:100%; height:100%;"></div>
         <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:75%; height:110px; border:2px dashed #16a34a; border-radius:8px; box-shadow:0 0 0 4000px rgba(0,0,0,0.5); pointer-events:none; z-index:10;">
@@ -187,9 +187,18 @@ button:disabled{opacity:.45}
 
 <div id="toast"></div>
 
-<!-- 使用国内稳定 CDN -->
+<!-- 增加极高可用的备用 CDN 自动切换机制 -->
 <script src="https://lf3-cdn-tos.bytecdntp.com/cdn/expire-1-M/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
 <script src="https://lf3-cdn-tos.bytecdntp.com/cdn/expire-1-M/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+  // 如果上面的没加载出来，尝试国内其他备选线路
+  if(!window.XLSX){
+    document.write('<script src="https://cdn.bootcdn.net/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"><\/script>');
+  }
+  if(!window.Html5Qrcode){
+    document.write('<script src="https://cdn.bootcdn.net/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"><\/script>');
+  }
+</script>
 <script>
 (function(){
 'use strict';
@@ -357,7 +366,7 @@ function undoLast(){
   s.updatedAt=Date.now();
   saveDB();
   
-  lastCode = {code: '', t: 0}; // 撤销后重置记忆，解决撤销后卡死问题
+  lastCode = {code: '', t: 0}; // 撤销后重置记忆
   
   showResult(true, '已撤销：'+last.name, '减少 '+(last.d/10)+' 条');
   refreshAll();
@@ -373,7 +382,7 @@ async function startScan(){
   try{
     scanner = new Html5Qrcode('reader', {
       verbose: false,
-      experimentalFeatures: { useBarCodeDetectorIfSupported: true }, // 开启原生硬件解码（支持反向）
+      experimentalFeatures: { useBarCodeDetectorIfSupported: true },
       formatsToSupport: [
         Html5QrcodeSupportedFormats.EAN_13,
         Html5QrcodeSupportedFormats.EAN_8,
@@ -385,12 +394,10 @@ async function startScan(){
     
     await scanner.start(
       { facingMode: 'environment' },
-      { 
-        fps: 20 // 提高帧率，去掉 qrbox 让组件识别全屏，配合 HTML 覆盖框视觉效果最好
-      },
+      { fps: 20 },
       function(text){
         const now=Date.now();
-        if(text === lastCode.code && now - lastCode.t < 2000) return; // 2秒防抖
+        if(text === lastCode.code && now - lastCode.t < 2000) return;
         lastCode = {code: text, t: now};
         handleCode(text);
       }
@@ -689,6 +696,7 @@ $('#btnImportAppend').onclick=function(){ isAppendMode = true; $('#fileXlsx').cl
 
 $('#fileXlsx').onchange=function(e){
   const f=e.target.files[0]; if(!f) return;
+  if(!window.XLSX){ toast('表格解析组件加载失败，请刷新或使用粘贴导入'); return; }
   const reader=new FileReader();
   reader.onload=function(ev){
     try{
@@ -844,16 +852,6 @@ function init(){
 init();
 
 })();
-<script src="https://cdn.bootcdn.net/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
-<script src="https://cdn.bootcdn.net/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script>
-  // 如果上面的没加载出来，尝试备用源
-  if(!window.XLSX){
-    document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"><\/script>');
-  }
-  if(!window.Html5Qrcode){
-    document.write('<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"><\/script>');
-  }
 </script>
 </body>
 </html>
