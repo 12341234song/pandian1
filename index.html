@@ -383,8 +383,21 @@ async function startScan(){
     });
     
     await scanner.start(
-      { facingMode: 'environment' },
-      { fps: 20 },
+      { 
+        facingMode: 'environment',
+        width: { ideal: 1920 },
+        height: { ideal: 1080 },
+        focusMode: { ideal: 'continuous' } 
+      },
+      { 
+        fps: 25, 
+        qrbox: function(viewfinderWidth, viewfinderHeight) {
+          let width = Math.floor(viewfinderWidth * 0.75);
+          let height = Math.floor(viewfinderHeight * 0.25);
+          return { width: width, height: height };
+        },
+        disableFlip: false
+      },
       function(text){
         const now=Date.now();
         if(text === lastCode.code && now - lastCode.t < 2000) return;
@@ -401,6 +414,7 @@ async function startScan(){
     scanner=null; scanning=false;
   }
 }
+
 async function stopScan(){
   if(scanner){
     try{ if(scanning) await scanner.stop(); }catch(e){}
