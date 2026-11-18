@@ -81,12 +81,14 @@ button:disabled{opacity:.45}
     <div class="card" id="sessionInfo"></div>
 
     <div class="card" style="padding:8px">
-     <div style="position:relative; border-radius:10px; overflow:hidden; background:#000; min-height:250px;">
-  <div id="reader" style="width:100%; height:100%;"></div>
-  <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:75%; height:100px; border:2px dashed #16a34a; border-radius:8px; box-shadow:0 0 0 4000px rgba(0,0,0,0.5); pointer-events:none; z-index:10;">
-    <div style="position:absolute; bottom:-30px; left:0; width:100%; text-align:center; color:#fff; font-size:13px; text-shadow:0 1px 2px #000;">请将条形码对准框内（正反均可）</div>
-  </div>
-</div>
+      <!-- 扫码视频与覆盖框 -->
+      <div style="position:relative; width:100%; min-height:250px; border-radius:10px; overflow:hidden; background:#000;">
+        <div id="reader" style="width:100%; height:100%;"></div>
+        <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:75%; height:110px; border:2px dashed #16a34a; border-radius:8px; box-shadow:0 0 0 4000px rgba(0,0,0,0.5); pointer-events:none; z-index:10;">
+          <div style="position:absolute; bottom:-32px; left:0; width:100%; text-align:center; color:#fff; font-size:13px; text-shadow:0 1px 2px #000;">请将条形码对准框内（正反均可）</div>
+        </div>
+      </div>
+      
       <div class="btnrow">
         <button id="btnScan" class="primary">开始扫码</button>
         <button id="btnUndo">撤销上一笔</button>
@@ -135,7 +137,7 @@ button:disabled{opacity:.45}
     <div class="card">
       <div class="cardtitle">商品资料</div>
       <div id="dataStat" class="muted">尚未导入</div>
-           <div class="btnrow">
+      <div class="btnrow">
         <button class="primary" id="btnImportAppend">追加/更新 Excel</button>
         <button id="btnImportXlsx">覆盖导入 Excel</button>
       </div>
@@ -185,20 +187,19 @@ button:disabled{opacity:.45}
 
 <div id="toast"></div>
 
-<script src="html5-qrcode.min.js"></script>
-<script src="xlsx.full.min.js"></script>
+<!-- 使用国内稳定 CDN -->
+<script src="https://lf3-cdn-tos.bytecdntp.com/cdn/expire-1-M/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+<script src="https://lf3-cdn-tos.bytecdntp.com/cdn/expire-1-M/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 (function(){
 'use strict';
 
-/* ==================== 工具函数 ==================== */
 const $ = s => document.querySelector(s);
 function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
 function pad(n){ return String(n).padStart(2,'0'); }
 function fmtTime(ts){ const d=new Date(ts); return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+' '+pad(d.getHours())+':'+pad(d.getMinutes()); }
 function fmtClock(ts){ const d=new Date(ts); return pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds()); }
-// 以「包」为单位的整数，转换为「条」显示
 function fmtTiao(packs){ const v = packs/10; return Number.isInteger(v) ? String(v) : v.toFixed(1); }
 
 let toastTimer=null;
@@ -207,17 +208,15 @@ function toast(msg){
   clearTimeout(toastTimer); toastTimer=setTimeout(()=>el.classList.remove('show'),1800);
 }
 
-/* ==================== 条码归一化 ==================== */
 function norm(v){
   if(v===null||v===undefined) return '';
   let s = String(v).trim().replace(/[\s\-]/g,'');
   if(!s) return '';
-  if(!/^\d+$/.test(s)) return s;           // 非纯数字，原样返回
-  while(s.length>=12 && s.length<13) s='0'+s; // UPC-A(12位) 补前导0成 EAN-13
+  if(!/^\d+$/.test(s)) return s;
+  while(s.length>=12 && s.length<13) s='0'+s;
   return s;
 }
 
-/* ==================== 数据层（localStorage） ==================== */
 const LS_KEY='pds_v1';
 let DB=null;
 
@@ -233,9 +232,8 @@ function saveDB(){
   catch(e){ toast('本地存储已满，请导出备份后删除历史记录'); }
 }
 
-/* ==================== 条码索引 ==================== */
-let CODE_MAP={};      // code -> {name, unit:'条'|'包'}
-let CONFLICTS=[];     // 冲突条码
+let CODE_MAP={};
+let CONFLICTS=[];
 
 function buildIndex(){
   CODE_MAP={}; CONFLICTS=[];
@@ -255,7 +253,6 @@ function buildIndex(){
   });
 }
 
-/* ==================== 会话（盘库单） ==================== */
 function currentSession(){
   return DB.sessions.find(s=>s.id===DB.currentId) || null;
 }
@@ -288,7 +285,6 @@ function sessionStat(s){
   return {packs, kinds};
 }
 
-/* ==================== 扫码核心 ==================== */
 let scanner=null, scanning=false;
 let lastCode={code:'', t:0};
 
@@ -310,7 +306,6 @@ function handleCode(raw){
   const code=norm(raw);
   if(!code) return;
 
-  // 未导入商品资料时给出提示
   if(!DB.rows.length){
     toast('请先到【设置】导入商品资料 Excel');
     return;
@@ -330,7 +325,7 @@ function handleCode(raw){
     return;
   }
 
-  const delta = hit.unit==='条' ? 10 : 1;   // 条=+10包，包=+1包
+  const delta = hit.unit==='条' ? 10 : 1;
   s.counts[hit.name] = (s.counts[hit.name]||0) + delta;
   s.scanCount = (s.scanCount||0) + 1;
   s.logs.push({t:Date.now(), code:code, name:hit.name, d:delta, unit:hit.unit});
@@ -361,26 +356,13 @@ function undoLast(){
   s.scanCount = Math.max(0, (s.scanCount||1)-1);
   s.updatedAt=Date.now();
   saveDB();
-  showResult(true, '已撤销：'+last.name, '减少 '+(last.d/10)+' 条');
-  function undoLast(){
-  const s=currentSession();
-  if(!s){ toast('当前没有盘库单'); return; }
-  const last=s.logs.pop();
-  if(!last){ toast('没有可撤销的记录'); return; }
-  s.counts[last.name] = (s.counts[last.name]||0) - last.d;
-  if(s.counts[last.name] <= 0) delete s.counts[last.name];
-  s.scanCount = Math.max(0, (s.scanCount||1)-1);
-  s.updatedAt=Date.now();
-  saveDB();
   
-  lastCode = {code: '', t: 0};  // ⭐ 加上这一行，清空记忆，解决撤销后扫不上的问题
+  lastCode = {code: '', t: 0}; // 撤销后重置记忆，解决撤销后卡死问题
   
   showResult(true, '已撤销：'+last.name, '减少 '+(last.d/10)+' 条');
   refreshAll();
-}refreshAll();
 }
 
-/* ==================== 摄像头扫码 ==================== */
 async function startScan(){
   if(scanning) return;
   if(!window.Html5Qrcode){ toast('扫码组件未加载，请检查网络后刷新'); return; }
@@ -391,7 +373,7 @@ async function startScan(){
   try{
     scanner = new Html5Qrcode('reader', {
       verbose: false,
-      experimentalFeatures: { useBarCodeDetectorIfSupported: true },
+      experimentalFeatures: { useBarCodeDetectorIfSupported: true }, // 开启原生硬件解码（支持反向）
       formatsToSupport: [
         Html5QrcodeSupportedFormats.EAN_13,
         Html5QrcodeSupportedFormats.EAN_8,
@@ -400,56 +382,21 @@ async function startScan(){
         Html5QrcodeSupportedFormats.UPC_E
       ]
     });
+    
     await scanner.start(
       { facingMode: 'environment' },
-      { fps: 10 }, // 帧率降低到10，避免连续几帧抓取同一个码
+      { 
+        fps: 20 // 提高帧率，去掉 qrbox 让组件识别全屏，配合 HTML 覆盖框视觉效果最好
+      },
       function(text){
         const now=Date.now();
-        // 同个码 2 秒内只算一次（给你时间把手机拿开换下一包）
-        if(text === lastCode.code && now - lastCode.t < 2000) return; 
+        if(text === lastCode.code && now - lastCode.t < 2000) return; // 2秒防抖
         lastCode = {code: text, t: now};
         handleCode(text);
       }
     );
     scanning = true;
     $('#btnScan').textContent = '停止扫码';
-    $('#btnScan').classList.remove('primary');
-  }catch(e){
-    toast('摄像头启动失败：'+(e && e.message ? e.message : e)+'（需 HTTPS 并允许相机权限）');
-    try{ if(scanner) await scanner.clear(); }catch(_){}
-    scanner=null; scanning=false;
-  }
-}
-  if(scanning) return;
-  if(!window.Html5Qrcode){ toast('扫码组件未加载，请检查网络后刷新'); return; }
-  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
-    toast('当前浏览器不支持摄像头，请手动输入条码');
-    return;
-  }
-  try{
-          scanner = new Html5Qrcode('reader', {
-      verbose: false,
-      // 指定只识别常见的条形码格式，大幅提升扫描速度
-      formatsToSupport: [
-        Html5QrcodeSupportedFormats.EAN_13,
-        Html5QrcodeSupportedFormats.EAN_8,
-        Html5QrcodeSupportedFormats.CODE_128,
-        Html5QrcodeSupportedFormats.UPC_A,
-        Html5QrcodeSupportedFormats.UPC_E
-      ]
-    });
-    await scanner.start(
-      {facingMode:'environment'},
-      {fps: 25}, // 取消固定扫码框，扫描全屏画面（支持正反向、各角度）
-      function(text){
-        const now=Date.now();
-        if(text===lastCode.code && now-lastCode.t < 1500) return; // 同一码 1.5s 内防抖
-        lastCode={code:text, t:now};
-        handleCode(text);
-      }
-    );
-    scanning=true;
-    $('#btnScan').textContent='停止扫码';
     $('#btnScan').classList.remove('primary');
   }catch(e){
     toast('摄像头启动失败：'+(e && e.message ? e.message : e)+'（需 HTTPS 并允许相机权限）');
@@ -467,7 +414,6 @@ async function stopScan(){
   $('#btnScan').classList.add('primary');
 }
 
-/* ==================== 渲染 ==================== */
 function renderShopSelect(){
   const sel=$('#shopSelect');
   const cur=sel.value;
@@ -572,7 +518,6 @@ function renderItems(){
   }).join('');
 }
 
-// 明细页加减（委托）
 $('#itemList').addEventListener('click', function(e){
   const btn=e.target.closest('button[data-act]');
   if(!btn) return;
@@ -648,24 +593,40 @@ function renderShopList(){
   const box=$('#shopList');
   box.innerHTML=DB.shops.map(function(s){
     return '<div class="item"><div class="item-name">'+esc(s.name)+'</div>'+
-      '<div class="item-ops"><button data-shop="del" data-id="'+s.id+'" class="danger">删除</button></div></div>';
+      '<div class="item-ops">'+
+      '<button data-shop="edit" data-id="'+s.id+'" style="margin-right:6px">改名</button>'+
+      '<button data-shop="del" data-id="'+s.id+'" class="danger">删除</button>'+
+      '</div></div>';
   }).join('');
 }
 $('#shopList').addEventListener('click', function(e){
   const btn=e.target.closest('button[data-shop]');
   if(!btn) return;
-  if(btn.getAttribute('data-shop')!=='del') return;
-  if(DB.shops.length<=1){ toast('至少保留一个门店'); return; }
-  const id=btn.getAttribute('data-id');
-  if(!confirm('删除该门店？（历史盘库记录不受影响）')) return;
-  DB.shops=DB.shops.filter(function(s){ return s.id!==id; });
-  if(!DB.shops.some(function(s){ return s.id===$('#shopSelect').value; })){
-    DB.currentId=null;
+  const act = btn.getAttribute('data-shop');
+  const id = btn.getAttribute('data-id');
+  const shop = DB.shops.find(function(s){ return s.id===id; });
+  if(!shop) return;
+
+  if(act === 'edit'){
+    const newName = prompt('请输入新的门店名称：', shop.name);
+    if(newName && newName.trim()){
+      shop.name = newName.trim();
+      const curS = DB.sessions.find(function(x){ return x.shopId===id && x.status==='进行中'; });
+      if(curS) curS.shopName = shop.name;
+      saveDB(); renderShopSelect(); refreshAll(); 
+      toast('门店名称已修改');
+    }
+  }else if(act === 'del'){
+    if(DB.shops.length<=1){ toast('至少保留一个门店'); return; }
+    if(!confirm('删除该门店？（历史盘库记录不受影响）')) return;
+    DB.shops=DB.shops.filter(function(s){ return s.id!==id; });
+    if(!DB.shops.some(function(s){ return s.id===$('#shopSelect').value; })){
+      DB.currentId=null;
+    }
+    saveDB(); renderShopSelect(); refreshAll();
   }
-  saveDB(); renderShopSelect(); refreshAll();
 });
 
-/* ==================== 导出 ==================== */
 function exportCsv(s){
   const lines=['品规名称,数量(条),数量(包)'];
   Object.keys(s.counts).filter(function(n){ return s.counts[n]>0; }).sort().forEach(function(n){
@@ -682,14 +643,13 @@ function exportCsv(s){
   setTimeout(function(){ URL.revokeObjectURL(a.href); }, 3000);
 }
 
-/* ==================== Excel / 文本导入 ==================== */
 function parseRows(arr, isAppend){
   const newRows=[];
   arr.forEach(function(r, i){
     if(!r || !r.length) return;
     const c0=norm(r[0]), c1=norm(r[1]);
     const name=String(r[2]==null?'':r[2]).trim();
-    if(i===0 && /条码|编码|名称/.test(String(r[0]||'')+String(r[2]||''))) return; // 跳过表头
+    if(i===0 && /条码|编码|名称/.test(String(r[0]||'')+String(r[2]||''))) return;
     if(!name) return;
     if(!c0 && !c1) return;
     newRows.push({tiao:c0, he:c1, name:name});
@@ -700,17 +660,16 @@ function parseRows(arr, isAppend){
   if(isAppend){
     let added = 0, updated = 0;
     newRows.forEach(nr => {
-      // 寻找老库里是否有相同的条码或相同的品规名称
       let oldIndex = DB.rows.findIndex(or => 
         (nr.tiao && or.tiao && nr.tiao === or.tiao) || 
         (nr.he && or.he && nr.he === or.he) || 
         (nr.name === or.name)
       );
       if(oldIndex >= 0){
-        DB.rows[oldIndex] = nr; // 更新老数据
+        DB.rows[oldIndex] = nr;
         updated++;
       }else{
-        DB.rows.push(nr); // 追加新数据
+        DB.rows.push(nr);
         added++;
       }
     });
@@ -736,7 +695,7 @@ $('#fileXlsx').onchange=function(e){
       const wb=XLSX.read(new Uint8Array(ev.target.result), {type:'array'});
       const ws=wb.Sheets[wb.SheetNames[0]];
       const arr=XLSX.utils.sheet_to_json(ws, {header:1, raw:true, defval:''});
-      parseRows(arr, isAppendMode); // 传入模式
+      parseRows(arr, isAppendMode);
     }catch(err){ toast('解析失败：'+err.message); }
     e.target.value='';
   };
@@ -751,10 +710,9 @@ $('#btnPasteParse').onclick=function(){
   const text=$('#pasteArea').value;
   if(!text.trim()){ toast('请先粘贴内容'); return; }
   const arr=text.split(/\r?\n/).map(function(l){ return l.split('\t'); });
-  parseRows(arr, false);;
+  parseRows(arr, false);
 };
 
-/* ==================== 备份 / 恢复 ==================== */
 $('#btnBackup').onclick=function(){
   const blob=new Blob([JSON.stringify(DB,null,2)], {type:'application/json'});
   const a=document.createElement('a');
@@ -788,7 +746,6 @@ $('#btnClear').onclick=function(){
   toast('已清空');
 };
 
-/* ==================== 门店操作 ==================== */
 $('#btnAddShop').onclick=function(){
   const name=($('#newShopName').value||'').trim();
   if(!name){ toast('请输入门店名称'); return; }
@@ -805,7 +762,6 @@ $('#shopSelect').onchange=function(){
   saveDB(); refreshAll();
 };
 
-/* ==================== 页面切换 ==================== */
 function switchPage(name){
   document.querySelectorAll('.page').forEach(function(p){ p.classList.remove('active'); });
   const pg=document.getElementById('page-'+name);
@@ -822,7 +778,6 @@ document.querySelectorAll('.tabbar button').forEach(function(b){
   b.onclick=function(){ switchPage(b.getAttribute('data-page')); };
 });
 
-/* ==================== 统一刷新 ==================== */
 function refreshAll(){
   renderSessionInfo();
   renderStats();
@@ -833,7 +788,6 @@ function refreshAll(){
   renderDataStat();
 }
 
-/* ==================== 事件绑定 ==================== */
 $('#btnScan').onclick=function(){ scanning ? stopScan() : startScan(); };
 $('#btnUndo').onclick=undoLast;
 
@@ -866,16 +820,13 @@ $('#btnNewSession').onclick=function(){
   toast('已新建盘库单');
 };
 
-// 离开页面时释放摄像头
 window.addEventListener('pagehide', stopScan);
 
-/* ==================== 启动 ==================== */
 function init(){
   loadDB();
   buildIndex();
   renderShopSelect();
 
-  // 默认选中：最近一次盘库单所在的门店
   if(DB.currentId){
     const s=DB.sessions.find(function(x){ return x.id===DB.currentId; });
     if(s) $('#shopSelect').value=s.shopId;
