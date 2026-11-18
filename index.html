@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="format-detection" content="telephone=no">
+<title>扫码盘库</title>
+<style>
+:root{--blue:#1677ff;--green:#16a34a;--red:#dc2626;--gray:#6b7280;--line:#e5e7eb}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;background:#f3f4f6;color:#111827;font-size:15px;padding-bottom:76px}
+.topbar{position:sticky;top:0;z-index:30;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.07)}
+.row1{display:flex;align-items:center;justify-content:space-between;padding:10px 12px 4px}
+.title{font-weight:700;font-size:17px}
+.row2{display:flex;gap:8px;padding:6px 12px 10px}
+select,input,textarea{font-size:15px;padding:9px 10px;border:1px solid #d1d5db;border-radius:8px;background:#fff;color:#111827;outline:none;width:100%;font-family:inherit}
+textarea{min-height:90px;margin-top:8px}
+button{font-size:15px;border:none;border-radius:8px;padding:10px 14px;background:#eef0f3;color:#111827;font-weight:500;font-family:inherit}
+button.primary{background:var(--blue);color:#fff}
+button.danger{background:#fee2e2;color:var(--red)}
+button:active{opacity:.75}
+button:disabled{opacity:.45}
+.page{display:none;padding:12px}
+.page.active{display:block}
+.card{background:#fff;border-radius:12px;padding:12px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.05)}
+.cardtitle{font-weight:600;margin-bottom:8px;font-size:14px;color:#374151}
+.muted{color:var(--gray);font-size:13px}
+.small{font-size:12.5px}
+.btnrow{display:flex;gap:8px;margin-top:8px}
+.btnrow button{flex:1}
+#reader{width:100%;border-radius:10px;overflow:hidden;background:#000}
+#reader video{width:100%!important;height:auto!important;display:block}
+.manualrow{display:flex;gap:8px;margin-top:8px}
+.manualrow input{flex:1}
+.manualrow button{white-space:nowrap}
+.statbar{display:flex;text-align:center}
+.statbar>div{flex:1;display:flex;flex-direction:column;gap:2px}
+.statbar span{font-size:12px;color:var(--gray)}
+.statbar b{font-size:19px;color:var(--blue)}
+.recent .ritem{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px dashed var(--line);font-size:14px}
+.recent .ritem:last-child{border-bottom:none}
+.hrow{display:flex;justify-content:space-between;align-items:center}
+.tag{font-size:12px;padding:2px 8px;border-radius:20px}
+.tag-doing{background:#dcfce7;color:#15803d}
+.tag-done{background:#e5e7eb;color:#4b5563}
+.item{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid #f1f2f4}
+.item:last-child{border-bottom:none}
+.item-name{flex:1;font-size:14px;word-break:break-all}
+.item-qty{text-align:right;font-weight:600;color:var(--blue);min-width:74px}
+.item-qty small{display:block;font-weight:400;color:var(--gray);font-size:11px}
+.item-ops{display:flex;gap:6px}
+.item-ops button{padding:6px 11px;font-size:16px;line-height:1;border-radius:8px}
+.empty{text-align:center;color:#9ca3af;padding:18px 0;font-size:14px}
+.tabbar{position:fixed;left:0;right:0;bottom:0;display:flex;background:#fff;border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom);z-index:30}
+.tabbar button{flex:1;background:none;border-radius:0;padding:11px 0;font-size:13px;color:#6b7280}
+.tabbar button.active{color:var(--blue);font-weight:700}
+#toast{position:fixed;left:50%;bottom:96px;transform:translateX(-50%);background:rgba(17,24,39,.9);color:#fff;padding:10px 16px;border-radius:20px;font-size:14px;z-index:99;opacity:0;transition:.25s;pointer-events:none;max-width:80%;text-align:center}
+#toast.show{opacity:1}
+.res-ok{border-left:4px solid var(--green)}
+.res-bad{border-left:4px solid var(--red)}
+.chk{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:14px;color:#374151}
+.chk input{width:auto}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="row1">
+    <div class="title">扫码盘库</div>
+  </div>
+  <div class="row2">
+    <select id="shopSelect"></select>
+    <button id="btnNewSession" class="primary" style="white-space:nowrap">新建盘库</button>
+  </div>
+</div>
+
+<main>
+  <!-- ========== 扫码页 ========== -->
+  <section class="page active" id="page-scan">
+    <div class="card" id="sessionInfo"></div>
+
+    <div class="card" style="padding:8px">
+      <div id="reader"></div>
+      <div class="btnrow">
+        <button id="btnScan" class="primary">开始扫码</button>
+        <button id="btnUndo">撤销上一笔</button>
+      </div>
+      <div class="manualrow">
+        <input id="manualInput" inputmode="numeric" placeholder="手动/扫码枪输入条码后回车">
+        <button id="btnManual">录入</button>
+      </div>
+    </div>
+
+    <div class="card" id="lastResultCard" style="display:none"></div>
+
+    <div class="card statbar">
+      <div><span>品规数</span><b id="statKinds">0</b></div>
+      <div><span>合计(条)</span><b id="statQty">0</b></div>
+      <div><span>扫描次数</span><b id="statScans">0</b></div>
+    </div>
+
+    <div class="card">
+      <div class="cardtitle">最近扫描</div>
+      <div id="recentList" class="recent"><div class="empty">暂无</div></div>
+    </div>
+
+    <div class="card" id="unknownCard" style="display:none">
+      <div class="cardtitle" style="color:var(--red)">未识别条码</div>
+      <div id="unknownList" class="small"></div>
+    </div>
+  </section>
+
+  <!-- ========== 明细页 ========== -->
+  <section class="page" id="page-list">
+    <div class="card">
+      <input id="itemSearch" placeholder="搜索品规名称">
+      <label class="chk"><input type="checkbox" id="chkAll"> 显示全部品规（含未扫到的）</label>
+    </div>
+    <div class="card" id="itemList"><div class="empty">暂无数据</div></div>
+  </section>
+
+  <!-- ========== 记录页 ========== -->
+  <section class="page" id="page-history">
+    <div id="historyList"></div>
+  </section>
+
+  <!-- ========== 设置页 ========== -->
+  <section class="page" id="page-set">
+    <div class="card">
+      <div class="cardtitle">商品资料</div>
+      <div id="dataStat" class="muted">尚未导入</div>
+      <div class="btnrow">
+        <button class="primary" id="btnImportXlsx">导入 Excel</button>
+        <button id="btnPasteToggle">粘贴导入</button>
+      </div>
+      <input type="file" id="fileXlsx" accept=".xlsx,.xls,.csv" style="display:none">
+      <div id="pasteBox" style="display:none">
+        <textarea id="pasteArea" placeholder="从 Excel 复制三列（条码 / 盒码 / 品规名称）粘贴到此，然后点“解析导入”"></textarea>
+        <div class="btnrow"><button class="primary" id="btnPasteParse">解析导入</button></div>
+      </div>
+      <div id="conflictBox" class="small" style="margin-top:8px"></div>
+    </div>
+
+    <div class="card">
+      <div class="cardtitle">门店管理</div>
+      <div id="shopList"></div>
+      <div class="manualrow" style="margin-top:10px">
+        <input id="newShopName" placeholder="新门店名称">
+        <button id="btnAddShop" class="primary">添加</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="cardtitle">数据备份</div>
+      <div class="btnrow">
+        <button id="btnBackup">导出备份(JSON)</button>
+        <button id="btnRestore">恢复备份</button>
+      </div>
+      <input type="file" id="fileJson" accept=".json" style="display:none">
+      <button id="btnClear" class="danger" style="width:100%;margin-top:8px">清空所有数据</button>
+    </div>
+
+    <div class="card muted small">
+      数据保存在本机浏览器中，更换手机或清理缓存会丢失，请定期导出备份。<br>
+      摄像头扫码需 HTTPS 环境；iOS 微信需 iOS 14.3 及以上版本。
+    </div>
+  </section>
+</main>
+
+<nav class="tabbar">
+  <button data-page="scan" class="active">扫码</button>
+  <button data-page="list">明细</button>
+  <button data-page="history">记录</button>
+  <button data-page="set">设置</button>
+</nav>
+
+<div id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script>
+(function(){
+'use strict';
+
+/* ==================== 工具函数 ==================== */
+const $ = s => document.querySelector(s);
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+function pad(n){ return String(n).padStart(2,'0'); }
+function fmtTime(ts){ const d=new Date(ts); return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+' '+pad(d.getHours())+':'+pad(d.getMinutes()); }
+function fmtClock(ts){ const d=new Date(ts); return pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds()); }
+// 以「包」为单位的整数，转换为「条」显示
+function fmtTiao(packs){ const v = packs/10; return Number.isInteger(v) ? String(v) : v.toFixed(1); }
+
+let toastTimer=null;
+function toast(msg){
+  const el=$('#toast'); el.textContent=msg; el.classList.add('show');
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>el.classList.remove('show'),1800);
+}
+
+/* ==================== 条码归一化 ==================== */
+function norm(v){
+  if(v===null||v===undefined) return '';
+  let s = String(v).trim().replace(/[\s\-]/g,'');
+  if(!s) return '';
+  if(!/^\d+$/.test(s)) return s;           // 非纯数字，原样返回
+  while(s.length>=12 && s.length<13) s='0'+s; // UPC-A(12位) 补前导0成 EAN-13
+  return s;
+}
+
+/* ==================== 数据层（localStorage） ==================== */
+const LS_KEY='pds_v1';
+let DB=null;
+
+function defaultDB(){
+  return { rows:[], shops:[{id:uid(), name:'默认门店'}], sessions:[], currentId:null };
+}
+function loadDB(){
+  try{ const s=localStorage.getItem(LS_KEY); if(s) DB=JSON.parse(s); }catch(e){ DB=null; }
+  if(!DB || !DB.shops || !DB.shops.length) DB=defaultDB();
+}
+function saveDB(){
+  try{ localStorage.setItem(LS_KEY, JSON.stringify(DB)); }
+  catch(e){ toast('本地存储已满，请导出备份后删除历史记录'); }
+}
+
+/* ==================== 条码索引 ==================== */
+let CODE_MAP={};      // code -> {name, unit:'条'|'包'}
+let CONFLICTS=[];     // 冲突条码
+
+function buildIndex(){
+  CODE_MAP={}; CONFLICTS=[];
+  (DB.rows||[]).forEach(r=>{
+    const name=(r.name||'').trim();
+    if(!name) return;
+    const pairs = [[norm(r.tiao),'条'],[norm(r.he),'包']];
+    pairs.forEach(([code,unit])=>{
+      if(!code) return;
+      const prev=CODE_MAP[code];
+      if(prev && prev.name!==name){
+        CONFLICTS.push({code, a:prev.name, b:name});
+        return;
+      }
+      if(!prev) CODE_MAP[code]={name, unit};
+    });
+  });
+}
+
+/* ==================== 会话（盘库单） ==================== */
+function currentSession(){
+  return DB.sessions.find(s=>s.id===DB.currentId) || null;
+}
+function newSession(shopId){
+  const shop=DB.shops.find(x=>x.id===shopId);
+  const s={
+    id:uid(), shopId:shopId, shopName:shop?shop.name:'默认门店',
+    startedAt:Date.now(), updatedAt:Date.now(), status:'进行中',
+    counts:{}, logs:[], scanCount:0, unknown:{}
+  };
+  DB.sessions.unshift(s);
+  DB.currentId=s.id;
+  saveDB();
+  return s;
+}
+function ensureSession(){
+  let s=DB.sessions.find(x=>x.id===DB.currentId);
+  if(s && s.status==='进行中') return s;
+  const shopId=$('#shopSelect').value || DB.shops[0].id;
+  s=DB.sessions.find(x=>x.shopId===shopId && x.status==='进行中');
+  if(!s) s=newSession(shopId);
+  DB.currentId=s.id; saveDB();
+  return s;
+}
+function sessionStat(s){
+  let packs=0, kinds=0;
+  if(s && s.counts){
+    for(const k in s.counts){ if(s.counts[k]>0){ packs+=s.counts[k]; kinds++; } }
+  }
+  return {packs, kinds};
+}
+
+/* ==================== 扫码核心 ==================== */
+let scanner=null, scanning=false;
+let lastCode={code:'', t:0};
+
+function feedback(ok){
+  if(navigator.vibrate) navigator.vibrate(ok?60:[40,60,40]);
+  try{
+    const ac=new (window.AudioContext||window.webkitAudioContext)();
+    const o=ac.createOscillator(), g=ac.createGain();
+    o.connect(g); g.connect(ac.destination);
+    o.type='sine'; o.frequency.value= ok?1200:380;
+    g.gain.setValueAtTime(0.16, ac.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime+0.13);
+    o.start(); o.stop(ac.currentTime+0.14);
+    setTimeout(()=>ac.close(), 400);
+  }catch(e){}
+}
+
+function handleCode(raw){
+  const code=norm(raw);
+  if(!code) return;
+
+  // 未导入商品资料时给出提示
+  if(!DB.rows.length){
+    toast('请先到【设置】导入商品资料 Excel');
+    return;
+  }
+
+  const hit=CODE_MAP[code];
+  const s=ensureSession();
+
+  if(!hit){
+    s.unknown = s.unknown || {};
+    s.unknown[code] = (s.unknown[code]||0) + 1;
+    s.updatedAt = Date.now();
+    saveDB();
+    feedback(false);
+    showResult(false, '未识别条码：'+code, '');
+    refreshAll();
+    return;
+  }
+
+  const delta = hit.unit==='条' ? 10 : 1;   // 条=+10包，包=+1包
+  s.counts[hit.name] = (s.counts[hit.name]||0) + delta;
+  s.scanCount = (s.scanCount||0) + 1;
+  s.logs.push({t:Date.now(), code:code, name:hit.name, d:delta, unit:hit.unit});
+  if(s.logs.length>300) s.logs.splice(0, s.logs.length-300);
+  s.updatedAt = Date.now();
+  saveDB();
+
+  feedback(true);
+  showResult(true, hit.name, (hit.unit==='条'?'条烟 +1':'包烟 +0.1') + ' ｜ 当前 ' + fmtTiao(s.counts[hit.name]) + ' 条');
+  refreshAll();
+}
+
+function showResult(ok, title, sub){
+  const card=$('#lastResultCard');
+  card.style.display='block';
+  card.className='card ' + (ok?'res-ok':'res-bad');
+  card.innerHTML='<div style="font-weight:600;font-size:16px">'+esc(title)+'</div>'+
+                 (sub?'<div class="muted small" style="margin-top:4px">'+esc(sub)+'</div>':'');
+}
+
+function undoLast(){
+  const s=currentSession();
+  if(!s){ toast('当前没有盘库单'); return; }
+  const last=s.logs.pop();
+  if(!last){ toast('没有可撤销的记录'); return; }
+  s.counts[last.name] = (s.counts[last.name]||0) - last.d;
+  if(s.counts[last.name] <= 0) delete s.counts[last.name];
+  s.scanCount = Math.max(0, (s.scanCount||1)-1);
+  s.updatedAt=Date.now();
+  saveDB();
+  showResult(true, '已撤销：'+last.name, '减少 '+(last.d/10)+' 条');
+  refreshAll();
+}
+
+/* ==================== 摄像头扫码 ==================== */
+async function startScan(){
+  if(scanning) return;
+  if(!window.Html5Qrcode){ toast('扫码组件未加载，请检查网络后刷新'); return; }
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+    toast('当前浏览器不支持摄像头，请手动输入条码');
+    return;
+  }
+  try{
+    scanner = new Html5Qrcode('reader', {verbose:false});
+    await scanner.start(
+      {facingMode:'environment'},
+      {fps:10, qrbox:{width:280, height:170}},
+      function(text){
+        const now=Date.now();
+        if(text===lastCode.code && now-lastCode.t < 1500) return; // 同一码 1.5s 内防抖
+        lastCode={code:text, t:now};
+        handleCode(text);
+      }
+    );
+    scanning=true;
+    $('#btnScan').textContent='停止扫码';
+    $('#btnScan').classList.remove('primary');
+  }catch(e){
+    toast('摄像头启动失败：'+(e && e.message ? e.message : e)+'（需 HTTPS 并允许相机权限）');
+    try{ if(scanner) await scanner.clear(); }catch(_){}
+    scanner=null; scanning=false;
+  }
+}
+async function stopScan(){
+  if(scanner){
+    try{ if(scanning) await scanner.stop(); }catch(e){}
+    try{ await scanner.clear(); }catch(e){}
+  }
+  scanner=null; scanning=false;
+  $('#btnScan').textContent='开始扫码';
+  $('#btnScan').classList.add('primary');
+}
+
+/* ==================== 渲染 ==================== */
+function renderShopSelect(){
+  const sel=$('#shopSelect');
+  const cur=sel.value;
+  sel.innerHTML = DB.shops.map(s=>'<option value="'+s.id+'">'+esc(s.name)+'</option>').join('');
+  if(cur && DB.shops.some(s=>s.id===cur)) sel.value=cur;
+}
+
+function renderSessionInfo(){
+  const box=$('#sessionInfo');
+  const s=currentSession();
+  if(!s){
+    box.innerHTML='<div class="muted">尚未开始盘库 —— 点击上方「新建盘库」，或直接扫码自动建单</div>';
+    return;
+  }
+  const st=sessionStat(s);
+  box.innerHTML =
+    '<div class="hrow"><b>'+esc(s.shopName)+'</b>'+
+      '<span class="tag '+(s.status==='进行中'?'tag-doing':'tag-done')+'">'+esc(s.status)+'</span></div>'+
+    '<div class="muted small" style="margin-top:4px">开始 '+fmtTime(s.startedAt)+
+      ' · 更新 '+fmtTime(s.updatedAt)+' · 品规 '+st.kinds+' · 合计 '+fmtTiao(st.packs)+' 条</div>'+
+    '<div class="btnrow">'+
+      '<button id="btnFinish" class="primary"'+(s.status!=='进行中'?' disabled':'')+'>完成本单</button>'+
+      '<button id="btnExportNow">导出本单CSV</button>'+
+    '</div>';
+
+  const bf=$('#btnFinish');
+  if(bf) bf.onclick=function(){
+    const cur=currentSession(); if(!cur) return;
+    if(!confirm('确认完成本单？完成后本单将归档到「记录」。')) return;
+    cur.status='已完成'; cur.updatedAt=Date.now();
+    DB.currentId=null; saveDB(); refreshAll(); toast('已归档');
+  };
+  const be=$('#btnExportNow');
+  if(be) be.onclick=function(){ const cur=currentSession(); if(cur) exportCsv(cur); };
+}
+
+function renderStats(){
+  const s=currentSession();
+  const st=sessionStat(s);
+  $('#statKinds').textContent = st.kinds;
+  $('#statQty').textContent = fmtTiao(st.packs);
+  $('#statScans').textContent = (s && s.scanCount) ? s.scanCount : 0;
+}
+
+function renderRecent(){
+  const s=currentSession();
+  const box=$('#recentList');
+  if(!s || !s.logs.length){ box.innerHTML='<div class="empty">暂无</div>'; return; }
+  const list=s.logs.slice(-8).reverse();
+  box.innerHTML=list.map(function(l){
+    return '<div class="ritem"><span>'+esc(l.name)+'</span>'+
+           '<span class="muted">'+fmtClock(l.t)+' &nbsp;'+(l.d===10?'+1':'+0.1')+'</span></div>';
+  }).join('');
+}
+
+function renderUnknown(){
+  const s=currentSession();
+  const card=$('#unknownCard'), box=$('#unknownList');
+  const u=(s && s.unknown) ? Object.keys(s.unknown) : [];
+  if(!u.length){ card.style.display='none'; return; }
+  card.style.display='block';
+  box.innerHTML=u.map(function(c){
+    return '<div style="padding:4px 0;border-bottom:1px dashed #eee">'+esc(c)+' × '+s.unknown[c]+'</div>';
+  }).join('');
+}
+
+function allProductNames(){
+  const set=new Set();
+  (DB.rows||[]).forEach(r=>{ if(r.name) set.add(r.name.trim()); });
+  return Array.from(set);
+}
+
+function renderItems(){
+  const s=currentSession();
+  const wrap=$('#itemList');
+  if(!s){ wrap.innerHTML='<div class="empty">暂无盘库单</div>'; return; }
+
+  const q=($('#itemSearch').value||'').trim();
+  const showAll=$('#chkAll').checked;
+  let rows;
+
+  if(showAll){
+    rows=allProductNames().map(function(n){ return [n, s.counts[n]||0]; });
+  }else{
+    rows=Object.keys(s.counts).filter(function(n){ return s.counts[n]>0; })
+                              .map(function(n){ return [n, s.counts[n]]; });
+  }
+  if(q) rows=rows.filter(function(r){ return r[0].indexOf(q)>=0; });
+  rows.sort(function(a,b){ return b[1]-a[1] || a[0].localeCompare(b[0]); });
+
+  if(!rows.length){ wrap.innerHTML='<div class="empty">暂无数据</div>'; return; }
+
+  wrap.innerHTML=rows.map(function(r){
+    const n=r[0], c=r[1];
+    return '<div class="item">'+
+      '<div class="item-name">'+esc(n)+'</div>'+
+      '<div class="item-qty">'+fmtTiao(c)+' 条<small>'+c+' 包</small></div>'+
+      '<div class="item-ops">'+
+        '<button data-act="minus" data-name="'+esc(n)+'">−</button>'+
+        '<button data-act="plus" data-name="'+esc(n)+'">＋</button>'+
+      '</div></div>';
+  }).join('');
+}
+
+// 明细页加减（委托）
+$('#itemList').addEventListener('click', function(e){
+  const btn=e.target.closest('button[data-act]');
+  if(!btn) return;
+  const s=currentSession(); if(!s) return;
+  const name=btn.getAttribute('data-name');
+  const act=btn.getAttribute('data-act');
+  const cur=s.counts[name]||0;
+  s.counts[name]= act==='plus' ? cur+1 : Math.max(0, cur-1);
+  if(s.counts[name]===0) delete s.counts[name];
+  s.updatedAt=Date.now();
+  saveDB(); refreshAll();
+});
+
+function renderHistory(){
+  const wrap=$('#historyList');
+  if(!DB.sessions.length){ wrap.innerHTML='<div class="card"><div class="empty">暂无盘库记录</div></div>'; return; }
+  const list=DB.sessions.slice().sort(function(a,b){ return b.startedAt-a.startedAt; });
+  wrap.innerHTML=list.map(function(s){
+    const st=sessionStat(s);
+    return '<div class="card">'+
+      '<div class="hrow"><b>'+esc(s.shopName)+'</b>'+
+        '<span class="tag '+(s.status==='进行中'?'tag-doing':'tag-done')+'">'+esc(s.status)+'</span></div>'+
+      '<div class="muted small" style="margin-top:4px">'+fmtTime(s.startedAt)+
+        ' · 品规 '+st.kinds+' · 合计 '+fmtTiao(st.packs)+' 条</div>'+
+      '<div class="btnrow">'+
+        '<button data-hact="view" data-id="'+s.id+'">查看</button>'+
+        '<button data-hact="csv" data-id="'+s.id+'">导出CSV</button>'+
+        '<button data-hact="cont" data-id="'+s.id+'">继续盘</button>'+
+        '<button data-hact="del" data-id="'+s.id+'" class="danger">删除</button>'+
+      '</div></div>';
+  }).join('');
+}
+
+$('#historyList').addEventListener('click', function(e){
+  const btn=e.target.closest('button[data-hact]');
+  if(!btn) return;
+  const id=btn.getAttribute('data-id');
+  const act=btn.getAttribute('data-hact');
+  const s=DB.sessions.find(function(x){ return x.id===id; });
+  if(!s) return;
+
+  if(act==='view'){
+    DB.currentId=s.id; saveDB(); refreshAll(); switchPage('list');
+  }else if(act==='csv'){
+    exportCsv(s);
+  }else if(act==='cont'){
+    s.status='进行中'; DB.currentId=s.id; saveDB(); refreshAll();
+    switchPage('scan'); toast('已切换到该盘库单');
+  }else if(act==='del'){
+    if(!confirm('确定删除这条盘库记录？不可恢复。')) return;
+    DB.sessions=DB.sessions.filter(function(x){ return x.id!==id; });
+    if(DB.currentId===id) DB.currentId=null;
+    saveDB(); refreshAll(); toast('已删除');
+  }
+});
+
+function renderDataStat(){
+  const names=new Set((DB.rows||[]).map(function(r){ return r.name; }));
+  $('#dataStat').textContent = DB.rows.length
+    ? ('已导入 '+DB.rows.length+' 行 · 品规 '+names.size+' 个 · 可用条码 '+Object.keys(CODE_MAP).length+' 个')
+    : '尚未导入（请先在下方导入 Excel）';
+
+  const box=$('#conflictBox');
+  if(CONFLICTS.length){
+    box.innerHTML='<span style="color:var(--red)">发现条码冲突（已保留第一条）：</span><br>'+
+      CONFLICTS.slice(0,10).map(function(c){ return esc(c.code)+'（'+esc(c.a)+' / '+esc(c.b)+'）'; }).join('<br>');
+  }else{
+    box.innerHTML='';
+  }
+}
+
+function renderShopList(){
+  const box=$('#shopList');
+  box.innerHTML=DB.shops.map(function(s){
+    return '<div class="item"><div class="item-name">'+esc(s.name)+'</div>'+
+      '<div class="item-ops"><button data-shop="del" data-id="'+s.id+'" class="danger">删除</button></div></div>';
+  }).join('');
+}
+$('#shopList').addEventListener('click', function(e){
+  const btn=e.target.closest('button[data-shop]');
+  if(!btn) return;
+  if(btn.getAttribute('data-shop')!=='del') return;
+  if(DB.shops.length<=1){ toast('至少保留一个门店'); return; }
+  const id=btn.getAttribute('data-id');
+  if(!confirm('删除该门店？（历史盘库记录不受影响）')) return;
+  DB.shops=DB.shops.filter(function(s){ return s.id!==id; });
+  if(!DB.shops.some(function(s){ return s.id===$('#shopSelect').value; })){
+    DB.currentId=null;
+  }
+  saveDB(); renderShopSelect(); refreshAll();
+});
+
+/* ==================== 导出 ==================== */
+function exportCsv(s){
+  const lines=['品规名称,数量(条),数量(包)'];
+  Object.keys(s.counts).filter(function(n){ return s.counts[n]>0; }).sort().forEach(function(n){
+    lines.push('"'+n+'",'+(s.counts[n]/10).toFixed(1)+','+s.counts[n]);
+  });
+  const st=sessionStat(s);
+  lines.push('"合计",'+(st.packs/10).toFixed(1)+','+st.packs);
+
+  const blob=new Blob(['\ufeff'+lines.join('\r\n')], {type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='盘库_'+s.shopName+'_'+fmtTime(s.startedAt).replace(/[:\s]/g,'')+'.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(function(){ URL.revokeObjectURL(a.href); }, 3000);
+}
+
+/* ==================== Excel / 文本导入 ==================== */
+function parseRows(arr){
+  const rows=[];
+  arr.forEach(function(r, i){
+    if(!r || !r.length) return;
+    const c0=norm(r[0]), c1=norm(r[1]);
+    const name=String(r[2]==null?'':r[2]).trim();
+    if(i===0 && /条码|编码|名称/.test(String(r[0]||'')+String(r[2]||''))) return; // 跳过表头
+    if(!name) return;
+    if(!c0 && !c1) return;
+    rows.push({tiao:c0, he:c1, name:name});
+  });
+  if(!rows.length){ toast('未解析到有效数据，请检查格式'); return; }
+  DB.rows=rows;
+  saveDB(); buildIndex(); refreshAll();
+  toast('导入成功：'+rows.length+' 行');
+}
+
+$('#btnImportXlsx').onclick=function(){ $('#fileXlsx').click(); };
+$('#fileXlsx').onchange=function(e){
+  const f=e.target.files[0]; if(!f) return;
+  const reader=new FileReader();
+  reader.onload=function(ev){
+    try{
+      const wb=XLSX.read(new Uint8Array(ev.target.result), {type:'array'});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const arr=XLSX.utils.sheet_to_json(ws, {header:1, raw:true, defval:''});
+      parseRows(arr);
+    }catch(err){ toast('解析失败：'+err.message); }
+    e.target.value='';
+  };
+  reader.readAsArrayBuffer(f);
+};
+
+$('#btnPasteToggle').onclick=function(){
+  const box=$('#pasteBox');
+  box.style.display = box.style.display==='none' ? 'block' : 'none';
+};
+$('#btnPasteParse').onclick=function(){
+  const text=$('#pasteArea').value;
+  if(!text.trim()){ toast('请先粘贴内容'); return; }
+  const arr=text.split(/\r?\n/).map(function(l){ return l.split('\t'); });
+  parseRows(arr);
+};
+
+/* ==================== 备份 / 恢复 ==================== */
+$('#btnBackup').onclick=function(){
+  const blob=new Blob([JSON.stringify(DB,null,2)], {type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='盘库备份_'+fmtTime(Date.now()).replace(/[:\s]/g,'')+'.json';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(function(){ URL.revokeObjectURL(a.href); }, 3000);
+};
+$('#btnRestore').onclick=function(){ $('#fileJson').click(); };
+$('#fileJson').onchange=function(e){
+  const f=e.target.files[0]; if(!f) return;
+  const reader=new FileReader();
+  reader.onload=function(ev){
+    try{
+      const obj=JSON.parse(ev.target.result);
+      if(!obj || !obj.sessions){ toast('备份文件格式不正确'); return; }
+      if(!confirm('恢复备份会覆盖当前所有数据，确定继续？')) return;
+      DB=obj;
+      if(!DB.shops || !DB.shops.length) DB.shops=[{id:uid(), name:'默认门店'}];
+      saveDB(); buildIndex(); renderShopSelect(); refreshAll();
+      toast('恢复成功');
+    }catch(err){ toast('恢复失败：'+err.message); }
+    e.target.value='';
+  };
+  reader.readAsText(f);
+};
+$('#btnClear').onclick=function(){
+  if(!confirm('将清空所有商品资料、门店与盘库记录，不可恢复！确定？')) return;
+  if(!confirm('再次确认：真的要清空吗？')) return;
+  DB=defaultDB(); saveDB(); buildIndex(); renderShopSelect(); refreshAll();
+  toast('已清空');
+};
+
+/* ==================== 门店操作 ==================== */
+$('#btnAddShop').onclick=function(){
+  const name=($('#newShopName').value||'').trim();
+  if(!name){ toast('请输入门店名称'); return; }
+  DB.shops.push({id:uid(), name:name});
+  saveDB(); renderShopSelect();
+  $('#shopSelect').value=DB.shops[DB.shops.length-1].id;
+  $('#newShopName').value='';
+  refreshAll(); toast('已添加门店');
+};
+$('#shopSelect').onchange=function(){
+  const shopId=this.value;
+  const s=DB.sessions.find(function(x){ return x.shopId===shopId && x.status==='进行中'; });
+  DB.currentId = s ? s.id : null;
+  saveDB(); refreshAll();
+};
+
+/* ==================== 页面切换 ==================== */
+function switchPage(name){
+  document.querySelectorAll('.page').forEach(function(p){ p.classList.remove('active'); });
+  const pg=document.getElementById('page-'+name);
+  if(pg) pg.classList.add('active');
+  document.querySelectorAll('.tabbar button').forEach(function(b){
+    b.classList.toggle('active', b.getAttribute('data-page')===name);
+  });
+  if(name!=='scan') stopScan();
+  if(name==='history') renderHistory();
+  if(name==='set'){ renderDataStat(); renderShopList(); }
+  if(name==='list') renderItems();
+}
+document.querySelectorAll('.tabbar button').forEach(function(b){
+  b.onclick=function(){ switchPage(b.getAttribute('data-page')); };
+});
+
+/* ==================== 统一刷新 ==================== */
+function refreshAll(){
+  renderSessionInfo();
+  renderStats();
+  renderRecent();
+  renderUnknown();
+  renderItems();
+  renderHistory();
+  renderDataStat();
+}
+
+/* ==================== 事件绑定 ==================== */
+$('#btnScan').onclick=function(){ scanning ? stopScan() : startScan(); };
+$('#btnUndo').onclick=undoLast;
+
+$('#btnManual').onclick=function(){
+  const v=$('#manualInput').value.trim();
+  if(!v){ toast('请输入条码'); return; }
+  handleCode(v);
+  $('#manualInput').value='';
+};
+$('#manualInput').addEventListener('keydown', function(e){
+  if(e.key==='Enter'){
+    e.preventDefault();
+    const v=this.value.trim();
+    if(v){ handleCode(v); this.value=''; }
+  }
+});
+
+$('#itemSearch').addEventListener('input', renderItems);
+$('#chkAll').addEventListener('change', renderItems);
+
+$('#btnNewSession').onclick=function(){
+  const cur=DB.sessions.find(function(x){ return x.id===DB.currentId; });
+  if(cur && cur.status==='进行中' && Object.keys(cur.counts).length){
+    if(!confirm('当前盘库单还有数据，是否结束它并新建一单？')) return;
+    cur.status='已完成'; cur.updatedAt=Date.now();
+  }
+  const shopId=$('#shopSelect').value || DB.shops[0].id;
+  newSession(shopId);
+  refreshAll();
+  toast('已新建盘库单');
+};
+
+// 离开页面时释放摄像头
+window.addEventListener('pagehide', stopScan);
+
+/* ==================== 启动 ==================== */
+function init(){
+  loadDB();
+  buildIndex();
+  renderShopSelect();
+
+  // 默认选中：最近一次盘库单所在的门店
+  if(DB.currentId){
+    const s=DB.sessions.find(function(x){ return x.id===DB.currentId; });
+    if(s) $('#shopSelect').value=s.shopId;
+  }else{
+    const last=DB.sessions.slice().sort(function(a,b){ return b.startedAt-a.startedAt; })[0];
+    if(last) $('#shopSelect').value=last.shopId;
+  }
+
+  refreshAll();
+
+  if(!DB.rows.length){
+    setTimeout(function(){ toast('提示：请先到【设置】导入商品资料 Excel'); }, 600);
+  }
+}
+init();
+
+})();
+</script>
+</body>
+</html>
