@@ -187,18 +187,8 @@ button:disabled{opacity:.45}
 
 <div id="toast"></div>
 
-<!-- 增加极高可用的备用 CDN 自动切换机制 -->
-<script src="https://lf3-cdn-tos.bytecdntp.com/cdn/expire-1-M/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
-<script src="https://lf3-cdn-tos.bytecdntp.com/cdn/expire-1-M/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script>
-  // 如果上面的没加载出来，尝试国内其他备选线路
-  if(!window.XLSX){
-    document.write('<script src="https://cdn.bootcdn.net/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"><\/script>');
-  }
-  if(!window.Html5Qrcode){
-    document.write('<script src="https://cdn.bootcdn.net/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"><\/script>');
-  }
-</script>
+<script src="html5-qrcode.min.js"></script>
+<script src="xlsx.full.min.js"></script>
 <script>
 (function(){
 'use strict';
