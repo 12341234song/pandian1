@@ -81,7 +81,12 @@ button:disabled{opacity:.45}
     <div class="card" id="sessionInfo"></div>
 
     <div class="card" style="padding:8px">
-      <div id="reader"></div>
+     <div style="position:relative; border-radius:10px; overflow:hidden; background:#000; min-height:250px;">
+  <div id="reader" style="width:100%; height:100%;"></div>
+  <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:75%; height:100px; border:2px dashed #16a34a; border-radius:8px; box-shadow:0 0 0 4000px rgba(0,0,0,0.5); pointer-events:none; z-index:10;">
+    <div style="position:absolute; bottom:-30px; left:0; width:100%; text-align:center; color:#fff; font-size:13px; text-shadow:0 1px 2px #000;">请将条形码对准框内（正反均可）</div>
+  </div>
+</div>
       <div class="btnrow">
         <button id="btnScan" class="primary">开始扫码</button>
         <button id="btnUndo">撤销上一笔</button>
@@ -357,11 +362,64 @@ function undoLast(){
   s.updatedAt=Date.now();
   saveDB();
   showResult(true, '已撤销：'+last.name, '减少 '+(last.d/10)+' 条');
+  function undoLast(){
+  const s=currentSession();
+  if(!s){ toast('当前没有盘库单'); return; }
+  const last=s.logs.pop();
+  if(!last){ toast('没有可撤销的记录'); return; }
+  s.counts[last.name] = (s.counts[last.name]||0) - last.d;
+  if(s.counts[last.name] <= 0) delete s.counts[last.name];
+  s.scanCount = Math.max(0, (s.scanCount||1)-1);
+  s.updatedAt=Date.now();
+  saveDB();
+  
+  lastCode = {code: '', t: 0};  // ⭐ 加上这一行，清空记忆，解决撤销后扫不上的问题
+  
+  showResult(true, '已撤销：'+last.name, '减少 '+(last.d/10)+' 条');
   refreshAll();
+}refreshAll();
 }
 
 /* ==================== 摄像头扫码 ==================== */
 async function startScan(){
+  if(scanning) return;
+  if(!window.Html5Qrcode){ toast('扫码组件未加载，请检查网络后刷新'); return; }
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+    toast('当前浏览器不支持摄像头，请手动输入条码');
+    return;
+  }
+  try{
+    scanner = new Html5Qrcode('reader', {
+      verbose: false,
+      experimentalFeatures: { useBarCodeDetectorIfSupported: true },
+      formatsToSupport: [
+        Html5QrcodeSupportedFormats.EAN_13,
+        Html5QrcodeSupportedFormats.EAN_8,
+        Html5QrcodeSupportedFormats.CODE_128,
+        Html5QrcodeSupportedFormats.UPC_A,
+        Html5QrcodeSupportedFormats.UPC_E
+      ]
+    });
+    await scanner.start(
+      { facingMode: 'environment' },
+      { fps: 10 }, // 帧率降低到10，避免连续几帧抓取同一个码
+      function(text){
+        const now=Date.now();
+        // 同个码 2 秒内只算一次（给你时间把手机拿开换下一包）
+        if(text === lastCode.code && now - lastCode.t < 2000) return; 
+        lastCode = {code: text, t: now};
+        handleCode(text);
+      }
+    );
+    scanning = true;
+    $('#btnScan').textContent = '停止扫码';
+    $('#btnScan').classList.remove('primary');
+  }catch(e){
+    toast('摄像头启动失败：'+(e && e.message ? e.message : e)+'（需 HTTPS 并允许相机权限）');
+    try{ if(scanner) await scanner.clear(); }catch(_){}
+    scanner=null; scanning=false;
+  }
+}
   if(scanning) return;
   if(!window.Html5Qrcode){ toast('扫码组件未加载，请检查网络后刷新'); return; }
   if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
