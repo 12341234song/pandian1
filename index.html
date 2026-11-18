@@ -522,9 +522,9 @@ function renderItems(){
     return '<div class="item">'+
       '<div class="item-name">'+esc(n)+'</div>'+
       '<div class="item-qty">'+fmtTiao(c)+' 条<small>'+c+' 包</small></div>'+
-      '<div class="item-ops">'+
-        '<button data-act="minus" data-name="'+esc(n)+'">−</button>'+
-        '<button data-act="plus" data-name="'+esc(n)+'">＋</button>'+
+           '<div class="item-ops">'+
+        '<button data-act="minus" data-name="'+esc(n)+'">-1条</button>'+
+        '<button data-act="plus" data-name="'+esc(n)+'">+1条</button>'+
       '</div></div>';
   }).join('');
 }
@@ -535,8 +535,9 @@ $('#itemList').addEventListener('click', function(e){
   const s=currentSession(); if(!s) return;
   const name=btn.getAttribute('data-name');
   const act=btn.getAttribute('data-act');
-  const cur=s.counts[name]||0;
-  s.counts[name]= act==='plus' ? cur+1 : Math.max(0, cur-1);
+   const cur=s.counts[name]||0;
+  // 点击一次加/减 10 包（即 1 条）
+  s.counts[name]= act==='plus' ? cur+10 : Math.max(0, cur-10);
   if(s.counts[name]===0) delete s.counts[name];
   s.updatedAt=Date.now();
   saveDB(); refreshAll();
