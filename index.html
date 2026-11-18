@@ -130,9 +130,12 @@ button:disabled{opacity:.45}
     <div class="card">
       <div class="cardtitle">商品资料</div>
       <div id="dataStat" class="muted">尚未导入</div>
+           <div class="btnrow">
+        <button class="primary" id="btnImportAppend">追加/更新 Excel</button>
+        <button id="btnImportXlsx">覆盖导入 Excel</button>
+      </div>
       <div class="btnrow">
-        <button class="primary" id="btnImportXlsx">导入 Excel</button>
-        <button id="btnPasteToggle">粘贴导入</button>
+        <button id="btnPasteToggle" style="flex:1">粘贴导入（覆盖）</button>
       </div>
       <input type="file" id="fileXlsx" accept=".xlsx,.xls,.csv" style="display:none">
       <div id="pasteBox" style="display:none">
@@ -622,8 +625,8 @@ function exportCsv(s){
 }
 
 /* ==================== Excel / 文本导入 ==================== */
-function parseRows(arr){
-  const rows=[];
+function parseRows(arr, isAppend){
+  const newRows=[];
   arr.forEach(function(r, i){
     if(!r || !r.length) return;
     const c0=norm(r[0]), c1=norm(r[1]);
@@ -631,15 +634,42 @@ function parseRows(arr){
     if(i===0 && /条码|编码|名称/.test(String(r[0]||'')+String(r[2]||''))) return; // 跳过表头
     if(!name) return;
     if(!c0 && !c1) return;
-    rows.push({tiao:c0, he:c1, name:name});
+    newRows.push({tiao:c0, he:c1, name:name});
   });
-  if(!rows.length){ toast('未解析到有效数据，请检查格式'); return; }
-  DB.rows=rows;
+  
+  if(!newRows.length){ toast('未解析到有效数据，请检查格式'); return; }
+  
+  if(isAppend){
+    let added = 0, updated = 0;
+    newRows.forEach(nr => {
+      // 寻找老库里是否有相同的条码或相同的品规名称
+      let oldIndex = DB.rows.findIndex(or => 
+        (nr.tiao && or.tiao && nr.tiao === or.tiao) || 
+        (nr.he && or.he && nr.he === or.he) || 
+        (nr.name === or.name)
+      );
+      if(oldIndex >= 0){
+        DB.rows[oldIndex] = nr; // 更新老数据
+        updated++;
+      }else{
+        DB.rows.push(nr); // 追加新数据
+        added++;
+      }
+    });
+    toast('导入成功：更新 '+updated+' 个，新增 '+added+' 个');
+  }else{
+    DB.rows = newRows;
+    toast('覆盖导入成功：共 '+newRows.length+' 行');
+  }
+  
   saveDB(); buildIndex(); refreshAll();
-  toast('导入成功：'+rows.length+' 行');
 }
 
-$('#btnImportXlsx').onclick=function(){ $('#fileXlsx').click(); };
+let isAppendMode = false;
+
+$('#btnImportXlsx').onclick=function(){ isAppendMode = false; $('#fileXlsx').click(); };
+$('#btnImportAppend').onclick=function(){ isAppendMode = true; $('#fileXlsx').click(); };
+
 $('#fileXlsx').onchange=function(e){
   const f=e.target.files[0]; if(!f) return;
   const reader=new FileReader();
@@ -648,7 +678,7 @@ $('#fileXlsx').onchange=function(e){
       const wb=XLSX.read(new Uint8Array(ev.target.result), {type:'array'});
       const ws=wb.Sheets[wb.SheetNames[0]];
       const arr=XLSX.utils.sheet_to_json(ws, {header:1, raw:true, defval:''});
-      parseRows(arr);
+      parseRows(arr, isAppendMode); // 传入模式
     }catch(err){ toast('解析失败：'+err.message); }
     e.target.value='';
   };
@@ -663,7 +693,7 @@ $('#btnPasteParse').onclick=function(){
   const text=$('#pasteArea').value;
   if(!text.trim()){ toast('请先粘贴内容'); return; }
   const arr=text.split(/\r?\n/).map(function(l){ return l.split('\t'); });
-  parseRows(arr);
+  parseRows(arr, false);;
 };
 
 /* ==================== 备份 / 恢复 ==================== */
